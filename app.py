@@ -1,16 +1,19 @@
 from flask.helpers import send_file
 from jinja2 import Template
-
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from os import path
 import re
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 import os
-
-
+from sklearn.preprocessing import LabelEncoder
+from sklearn.impute import SimpleImputer
 # Feature Scaling
-
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -24,15 +27,13 @@ import sys
 import os
 import glob
 import re
-
+import cv2
 from  PIL import Image, ImageOps
 # Keras
 from keras.applications.imagenet_utils import preprocess_input, decode_predictions
 from keras.models import load_model
 from keras.preprocessing import image
 import io
-
-
 matplotlib.use('Agg')
 
 app = Flask(__name__)
@@ -45,20 +46,6 @@ pathfordatasetNew = "data-preprocess/new/"
  
 app.config['DFPr'] = pathfordataset
 app.config['DFPrNew'] = pathfordatasetNew
-#------------------------------ Saving dataset for Linear regression-------------------------------------------
-# this is the path to save dataset for single variable LR
-pathforonevarLR = "static/Regression/onevarLR"
-pathforonevarLRplot = "Regression/onevarLR/plot"
-app.config['LR1VAR'] = pathforonevarLR
-app.config['LR1VARplot'] = pathforonevarLRplot
-
-#------------------------------ Saving image for K means-------------------------------------------
-# this is the path to save figure of K menas
-pathforelbowplot = "kmeans/plot"
-#pathforonevarLRplot = "Regression/onevarLR/plot"
-#app.config['LR1VAR'] = pathforonevarLR
-app.config['elbowplot'] = pathforelbowplot
-#print(app.config['elbowplot'])
 
 # for index page
 #------------------------------ Launcing undex page-------------------------------------------
@@ -103,8 +90,6 @@ def aboutusnew():
 @app.route('/ann')
 def ann():
     return render_template('/ann/ann.html')
-
-
 
 #----------------------Image Classification cat/ Dog------------------------------
 model_cat = load_model("static/data-preprocess/model/FDPCNN1.h5")
@@ -160,6 +145,52 @@ def cat1():
         
 
         return render_template('/ann/cat/catoutput.html', model_name=my_model_name,my_dataset=input_image, pred=preds, visualize=input )
+#-----------------------Digit Recognition---------------------------------------------
+model_digit = load_model("static/data-preprocess/model/MNISTANN.h5")
+
+def import_and_predict(image_data):
+  
+  image_resized = cv2.resize(image_data, (28, 28)) 
+   
+  prediction = model_digit.predict(image_resized.reshape(1,784))
+  print('Prediction Score:\n',prediction[0])
+  thresholded = (prediction>0.5)*1
+  print('\nThresholded Score:\n',thresholded[0])
+  print('\nPredicted Digit:',np.where(thresholded == 1)[1][0])
+  digit = np.where(thresholded == 1)[1][0]
+  #st.image(image_data, use_column_width=True)
+  return digit
+
+
+
+@app.route('/ann/digit/digit')
+def digit():
+    return render_template('/ann/digit/digit.html')
+
+
+@app.route('/ann/digit/digit',  methods=['GET', 'POST'])
+def digit1():
+   
+    if request.method == 'POST':
+        input_image = request.files['input_image']
+        print(input_image)
+        my_model_name = request.form['name_of_model']
+        
+        dataset_path = os.path.join(pathfordataset, secure_filename(input_image.filename))
+        input_image.save(dataset_path)
+        
+        get_dastaset = os.path.join(app.config['DFPr'],secure_filename( input_image .filename))
+        input=secure_filename(input_image.filename)
+        
+        image=Image.open(input_image)
+        image=np.array(image)
+        
+        #image=np.array(input_image)
+        preds = import_and_predict(image)
+
+        
+
+        return render_template('/ann/digit/digitoutput.html', model_name=my_model_name,my_dataset=input_image, pred=preds, visualize=input )
 
 
 
@@ -176,7 +207,3 @@ def add_header(response):
     response.headers['Expires'] = '-1'
     return response
 app.config["CACHE_TYPE"] = "null"
-
-
-
-
